@@ -17,7 +17,7 @@ class App {
       authStrategy: new LocalAuth(),
       // proxyAuthentication: { username: 'username', password: 'password' },
       puppeteer: { 
-          args: ['--no-sandbox'],
+          args: ['--no-sandbox', '--disable-setuid-sandbox'],
           headless: true
       }
     });
