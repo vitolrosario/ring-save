@@ -23,6 +23,17 @@ class App {
     });
     camera: any
 
+    waitTime(miliSeconds: number) {
+      return new Promise((resolve) => {
+  
+        setTimeout(() => {
+          resolve(true)
+        },
+          miliSeconds
+        )
+      })
+    }
+
     async record(camera: RingCamera) {
       try {
         await cleanOutputDirectory()
@@ -43,6 +54,8 @@ class App {
         const base64String = snap.toString('base64');
 
         const media = new MessageMedia("image/png", base64String, "Captura")
+        
+        await this.waitTime(2000)
 
         this.client.sendMessage('120363177595691956@g.us', media);
 
