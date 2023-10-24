@@ -55,7 +55,7 @@ class App {
 
         const media = new MessageMedia("image/png", base64String, "Captura")
         
-        await this.waitTime(2000)
+        // await this.waitTime(2000)
 
         this.client.sendMessage('120363177595691956@g.us', media);
 
