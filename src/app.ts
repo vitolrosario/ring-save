@@ -93,10 +93,10 @@ class App {
           console.log('Whatsapp web client ready');
         });
 
-        this.client.on('message', async msg => {
-          console.log(msg)
+        // this.client.on('message', async msg => {
+          // console.log(msg)
           // console.log(await msg.getChat())
-        });
+        // });
 
         console.log("Initializing ring...")
 
