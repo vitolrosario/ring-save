@@ -14,7 +14,7 @@ const qrcode = require('qrcode-terminal');
 
 class App {
     client: Client = new Client({
-      authStrategy: new LocalAuth(),
+      // authStrategy: new LocalAuth(),
       // proxyAuthentication: { username: 'username', password: 'password' },
       puppeteer: { 
           args: ['--no-sandbox', '--disable-setuid-sandbox'],
