@@ -1,13 +1,28 @@
-import { PushNotificationAction, RingApi, RingCamera } from 'ring-client-api'
+import { AnyCameraData, PushNotificationAction, RingApi, RingCamera } from 'ring-client-api'
 import 'dotenv/config'
 import { skip } from 'rxjs/operators'
-import { readFile, writeFile } from 'fs'
+import { readFile, writeFile, writeFileSync } from 'fs'
 import { promisify } from 'util'
 import { cleanOutputDirectory, outputDirectory } from './utils'
 import * as path from 'path'
 import { Image } from 'image-js'
+import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js'
+import { Buffer } from 'buffer'
+import { RingRestClient } from 'ring-client-api/lib/rest-client'
+// import test from 'qrcode-terminal'
+const qrcode = require('qrcode-terminal');
 
 class App {
+    client: Client = new Client({
+      authStrategy: new LocalAuth(),
+      // proxyAuthentication: { username: 'username', password: 'password' },
+      puppeteer: { 
+          // args: ['--proxy-server=proxy-server-that-requires-authentication.example.com'],
+          headless: true
+      }
+    });
+    camera: any
+
     async record(camera: RingCamera) {
       try {
         await cleanOutputDirectory()
@@ -25,8 +40,12 @@ class App {
       try {
         const snap = await camera.getSnapshot()
 
-        const img = await Image.load(snap)
-        img.save("snapshot.png")
+        const base64String = snap.toString('base64');
+
+        const media = new MessageMedia("image/png", base64String, "Captura")
+
+        this.client.sendMessage('120363177595691956@g.us', media);
+
       } 
       catch (error) {
         throw error
@@ -48,8 +67,26 @@ class App {
     }
 
     async run() {
+        console.log("Initializing whatsapp web...")
 
-        console.log("Initializing...")
+
+        this.client.initialize();
+        
+        this.client.on('qr', (qr) => {
+          qrcode.generate(qr, {small: true});
+        });
+                
+        this.client.on('ready', () => {
+          console.log('Whatsapp web client ready');
+        });
+
+        this.client.on('message', async msg => {
+          console.log(msg)
+          // console.log(await msg.getChat())
+        });
+
+        console.log("Initializing ring...")
+
         const { env } = process,
         ringApi = new RingApi({
             refreshToken: env.RING_REFRESH_TOKEN!,
@@ -64,8 +101,6 @@ class App {
       
         ringApi.onRefreshTokenUpdated.subscribe(
           async ({ newRefreshToken, oldRefreshToken }) => {
-            // If you are implementing a project that use `ring-client-api`, you should subscribe to onRefreshTokenUpdated and update your config each time it fires an event
-            // Here is an example using a .env file for configuration
             if (!oldRefreshToken) {
               return
             }
@@ -79,9 +114,7 @@ class App {
             devices = await location.getDevices()
       
           for (const camera of cameras) {
-            // await this.record(camera)
-            await this.takeSnapshot(camera)
-            // console.log(snap)
+            this.camera = camera
             console.log(`- ${camera.id}: ${camera.name} (${camera.deviceType})`)
           }
       
@@ -97,7 +130,8 @@ class App {
                   ? 'Doorbell pressed'
                   : `Video started (${notification.action})`
 
-              await this.record(camera)
+              // await this.record(camera)
+              this.takeSnapshot(this.camera)
       
               console.log(
                 `${event} on ${camera.name} camera. Ding id ${
