@@ -91,7 +91,7 @@ class App {
         this.client = new Client({
           authStrategy,
           puppeteer: { 
-              // args: ['--proxy-server=proxy-server-that-requires-authentication.example.com'],
+              args: ['--no-sandbox'],
               headless: true
           }
         });
