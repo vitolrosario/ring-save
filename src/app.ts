@@ -51,7 +51,7 @@ class App {
 
         const media = new MessageMedia("image/png", base64String, "Captura")
         
-        await this.waitTime(2000)
+        // await this.waitTime(2000)
 
         this.client.sendMessage('120363177595691956@g.us', media);
 
@@ -106,10 +106,10 @@ class App {
           console.log('Whatsapp web client ready');
         });
 
-        this.client.on('message', async msg => {
+        // this.client.on('message', async msg => {
           // console.log(msg)
           // console.log(await msg.getChat())
-        });
+        // });
 
         this.client.on('authenticated', (session) => {
           this.sessionData = session;
