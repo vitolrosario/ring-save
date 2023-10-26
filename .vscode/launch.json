@@ -5,19 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "ts-node",
-            "type": "node",
+            "command": "npm start",
+            "name": "debug",
             "request": "launch",
-            "args": [
-                "${relativeFile}"
-            ],
-            "runtimeArgs": [
-                "-r",
-                "ts-node/register"
-            ],
-            "cwd": "${workspaceRoot}/src/app.ts",
-            "protocol": "inspector",
-            "internalConsoleOptions": "openOnSessionStart"
-        }
-    ]
+            "type": "node-terminal",
+            "env": {
+            }
+        },
+    ],
 }

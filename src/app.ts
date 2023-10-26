@@ -1,27 +1,23 @@
 import { AnyCameraData, PushNotificationAction, RingApi, RingCamera } from 'ring-client-api'
 import 'dotenv/config'
 import { skip } from 'rxjs/operators'
-import { readFile, writeFile, writeFileSync } from 'fs'
+import { readFile, writeFile, writeFileSync, existsSync } from 'fs'
 import { promisify } from 'util'
 import { cleanOutputDirectory, outputDirectory } from './utils'
 import * as path from 'path'
 import { Image } from 'image-js'
-import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js'
+import { Client, LegacySessionAuth, LocalAuth, MessageMedia } from 'whatsapp-web.js'
 import { Buffer } from 'buffer'
 import { RingRestClient } from 'ring-client-api/lib/rest-client'
 // import test from 'qrcode-terminal'
 const qrcode = require('qrcode-terminal');
 
 class App {
-    client: Client = new Client({
-      authStrategy: new LocalAuth(),
-      // proxyAuthentication: { username: 'username', password: 'password' },
-      puppeteer: { 
-          // args: ['--proxy-server=proxy-server-that-requires-authentication.example.com'],
-          headless: true
-      }
-    });
-    camera: any
+  
+    SESSION_FILE_PATH: string = './session.json';
+    sessionData: any;
+    camera!: RingCamera
+    client!: Client
 
     waitTime(miliSeconds: number) {
       return new Promise((resolve) => {
@@ -79,9 +75,26 @@ class App {
       }
     }
 
-    async run() {
+    async startWhatsappWeb() {
+      try {
+        const { env } = process
+        
         console.log("Initializing whatsapp web...")
 
+        if(existsSync(this.SESSION_FILE_PATH)) {
+          this.sessionData = require(this.SESSION_FILE_PATH);
+        }
+        const authStrategy = env.USE_LEGACY === 'true' ? new LegacySessionAuth({
+          session: this.sessionData
+        }) : new LocalAuth() 
+
+        this.client = new Client({
+          authStrategy,
+          puppeteer: { 
+              // args: ['--proxy-server=proxy-server-that-requires-authentication.example.com'],
+              headless: true
+          }
+        });
 
         this.client.initialize();
         
@@ -94,69 +107,85 @@ class App {
         });
 
         this.client.on('message', async msg => {
-          console.log(msg)
+          // console.log(msg)
           // console.log(await msg.getChat())
         });
 
-        console.log("Initializing ring...")
+        this.client.on('authenticated', (session) => {
+          this.sessionData = session;
+          if (session)
+            writeFileSync(this.SESSION_FILE_PATH, JSON.stringify(session));
+        });  
+      } 
+      catch (error) {
+        throw error
+      }
+    }
 
-        const { env } = process,
-        ringApi = new RingApi({
-            refreshToken: env.RING_REFRESH_TOKEN!,
-            debug: true,
-        }),
-        locations = await ringApi.getLocations(),
-        allCameras = await ringApi.getCameras()
-      
-        console.log(
-          `Found ${locations.length} location(s) with ${allCameras.length} camera(s).`,
-        )
-      
-        ringApi.onRefreshTokenUpdated.subscribe(
-          async ({ newRefreshToken, oldRefreshToken }) => {
-            if (!oldRefreshToken) {
-              return
-            }
+    async startRing() {
 
-            await this.refreshToken(oldRefreshToken, newRefreshToken)
-          },
-        )
-      
-        for (const location of locations) {
-          const cameras = location.cameras,
-            devices = await location.getDevices()
-      
-          for (const camera of cameras) {
-            this.camera = camera
-            console.log(`- ${camera.id}: ${camera.name} (${camera.deviceType})`)
+      console.log("Initializing ring...")
+
+      const { env } = process,
+      ringApi = new RingApi({
+          refreshToken: env.RING_REFRESH_TOKEN!,
+          debug: true,
+      }),
+      locations = await ringApi.getLocations(),
+      allCameras = await ringApi.getCameras()
+    
+      console.log(
+        `Found ${locations.length} location(s) with ${allCameras.length} camera(s).`,
+      )
+    
+      ringApi.onRefreshTokenUpdated.subscribe(
+        async ({ newRefreshToken, oldRefreshToken }) => {
+          if (!oldRefreshToken) {
+            return
           }
-      
-        }
-      
-        if (allCameras.length) {
-          allCameras.forEach((camera) => {
-            camera.onNewNotification.subscribe(async (notification)=> {
-              const event =
-                notification.action === PushNotificationAction.Motion
-                  ? 'Motion detected'
-                  : notification.action === PushNotificationAction.Ding
-                  ? 'Doorbell pressed'
-                  : `Video started (${notification.action})`
 
-              // await this.record(camera)
-              this.takeSnapshot(this.camera)
-      
-              console.log(
-                `${event} on ${camera.name} camera. Ding id ${
-                  notification.ding.id
-                }.  Received at ${new Date()}`,
-              )
-            })
+          await this.refreshToken(oldRefreshToken, newRefreshToken)
+        },
+      )
+    
+      for (const location of locations) {
+        const cameras = location.cameras
+    
+        for (const camera of cameras) {
+          this.camera = camera
+          console.log(`- ${camera.id}: ${camera.name} (${camera.deviceType})`)
+        }
+    
+      }
+    
+      if (allCameras.length) {
+        allCameras.forEach((camera) => {
+          camera.onNewNotification.subscribe(async (notification)=> {
+            const event =
+              notification.action === PushNotificationAction.Motion
+                ? 'Motion detected'
+                : notification.action === PushNotificationAction.Ding
+                ? 'Doorbell pressed'
+                : `Video started (${notification.action})`
+
+            // await this.record(camera)
+            this.takeSnapshot(this.camera)
+    
+            console.log(
+              `${event} on ${camera.name} camera. Ding id ${
+                notification.ding.id
+              }.  Received at ${new Date()}`,
+            )
           })
-      
-          console.log('Listening for motion and doorbell presses on your cameras.')
-        }
+        })
+    
+        console.log('Listening for motion and doorbell presses on your cameras.')
+      }
+    }
 
+    async run() {
+      await this.startRing()
+      await this.startWhatsappWeb()
     }
 }
 
