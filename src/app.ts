@@ -1,7 +1,7 @@
 import { AnyCameraData, PushNotificationAction, RingApi, RingCamera } from 'ring-client-api'
 import 'dotenv/config'
 import { skip } from 'rxjs/operators'
-import { readFile, writeFile, writeFileSync, existsSync } from 'fs'
+import { readFile, readFileSync, statSync, unlinkSync, writeFile, writeFileSync, existsSync } from 'fs'
 import { promisify } from 'util'
 import { cleanOutputDirectory, outputDirectory } from './utils'
 import * as path from 'path'
@@ -9,6 +9,8 @@ import { Image } from 'image-js'
 import { Client, LegacySessionAuth, LocalAuth, MessageMedia } from 'whatsapp-web.js'
 import { Buffer } from 'buffer'
 import { RingRestClient } from 'ring-client-api/lib/rest-client'
+import { spawn } from 'node:child_process';
+
 // import test from 'qrcode-terminal'
 const qrcode = require('qrcode-terminal');
 
@@ -18,6 +20,8 @@ class App {
     sessionData: any;
     camera!: RingCamera
     client!: Client
+    snapshot = {updating: false}
+    pathToffmpeg: string = process.env.FFMPEG_PATH || "C:/ffmpeg/bin/ffmpeg.exe"
 
     waitTime(miliSeconds: number) {
       return new Promise((resolve) => {
@@ -30,29 +34,80 @@ class App {
       })
     }
 
+    checkFile(file:any, sizeInBytes: number = 0) {
+      sizeInBytes = sizeInBytes ? sizeInBytes : 0 
+      if (!existsSync(file)) {
+          return false
+      } else if (statSync(file).size > sizeInBytes) {
+          return true
+      } else {
+          return false           
+      }
+    }
+
     async record(camera: RingCamera) {
       try {
         await cleanOutputDirectory()
 
         console.log(`Recording video from ${camera.name} ...`)
-        await camera.recordToFile(path.join(outputDirectory, 'example.mp4'), 10)
+        await camera.recordToFile(path.join(outputDirectory, 'example.mp4'), 2)
         console.log('Done recording video')  
       } 
       catch (error) {
         throw error
       }
     }
-    
-    async takeSnapshot(camera: RingCamera) {
+
+    async getSnapshotFromVideo() {
+      if (this.snapshot.updating) {
+          console.log ('Snapshot update from live stream already in progress for camera '+this.camera.id)
+          throw new Error()
+      }
+      this.snapshot.updating = true
+      let newSnapshot!: Buffer
+
+      await cleanOutputDirectory()
+
+      const videoFile = path.join(outputDirectory, "example.mp4")
+
+      await this.camera.recordToFile(videoFile, 2)
+      
+      if (videoFile) {
+          const filePrefix = this.camera.id+'_motion_'+Date.now() 
+          const jpgFile = path.join('/tmp', filePrefix+'.jpg')
+          try {
+              await spawn(this.pathToffmpeg, ['-i', videoFile, '-s', '1280:720', '-r', "1", '-vframes', '1', '-q:v', '10', jpgFile])
+              await this.waitTime(3000)
+              if (this.checkFile(jpgFile)) {
+                  newSnapshot = readFileSync(jpgFile)
+                  unlinkSync(jpgFile)
+                  unlinkSync(videoFile)
+              }
+          } catch (e:any) {
+              console.log(e.stderr.toString())
+          }
+      }
+
+      if (newSnapshot) {
+          console.log('Successfully grabbed a snapshot from video for camera '+this.camera.id)
+      } else {
+          console.log('Failed to get snapshot from video camera '+this.camera.id)
+      }
+      this.snapshot.updating = false
+      return newSnapshot
+    }
+
+    async takeSnapshot() {
       try {
-        const snap = await camera.getSnapshot()
+        // const snap = await camera.getSnapshot()
+        const snap = await this.getSnapshotFromVideo()
+
+        if (!snap) return
 
         const base64String = snap.toString('base64');
 
         const media = new MessageMedia("image/png", base64String, "Captura")
         
-        // await this.waitTime(2000)
-
         this.client.sendMessage('120363177595691956@g.us', media);
 
       } 
@@ -104,6 +159,7 @@ class App {
                 
         this.client.on('ready', () => {
           console.log('Whatsapp web client ready');
+          // this.takeSnapshot()
         });
 
         // this.client.on('message', async msg => {
@@ -169,7 +225,7 @@ class App {
                 : `Video started (${notification.action})`
 
             // await this.record(camera)
-            this.takeSnapshot(this.camera)
+            this.takeSnapshot()
     
             console.log(
               `${event} on ${camera.name} camera. Ding id ${
