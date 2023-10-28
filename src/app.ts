@@ -23,159 +23,9 @@ class App {
     snapshot = {updating: false}
     pathToffmpeg: string = process.env.FFMPEG_PATH || "C:/ffmpeg/bin/ffmpeg.exe"
 
-    waitTime(miliSeconds: number) {
-      return new Promise((resolve) => {
-  
-        setTimeout(() => {
-          resolve(true)
-        },
-          miliSeconds
-        )
-      })
-    }
-
-    checkFile(file:any, sizeInBytes: number = 0) {
-      sizeInBytes = sizeInBytes ? sizeInBytes : 0 
-      if (!existsSync(file)) {
-          return false
-      } else if (statSync(file).size > sizeInBytes) {
-          return true
-      } else {
-          return false           
-      }
-    }
-
-    async record(camera: RingCamera) {
-      try {
-        await cleanOutputDirectory()
-
-        console.log(`Recording video from ${camera.name} ...`)
-        await camera.recordToFile(path.join(outputDirectory, 'example.mp4'), 2)
-        console.log('Done recording video')  
-      } 
-      catch (error) {
-        throw error
-      }
-    }
-
-    async getSnapshotFromVideo() {
-      if (this.snapshot.updating) {
-          console.log ('Snapshot update from live stream already in progress for camera '+this.camera.id)
-          throw new Error()
-      }
-      this.snapshot.updating = true
-      let newSnapshot!: Buffer
-
-      await cleanOutputDirectory()
-
-      const videoFile = path.join(outputDirectory, "example.mp4")
-
-      await this.camera.recordToFile(videoFile, 2)
-      
-      if (videoFile) {
-          const filePrefix = this.camera.id+'_motion_'+Date.now() 
-          const jpgFile = path.join('/tmp', filePrefix+'.jpg')
-          try {
-              await spawn(this.pathToffmpeg, ['-i', videoFile, '-s', '1280:720', '-r', "1", '-vframes', '1', '-q:v', '10', jpgFile])
-              await this.waitTime(3000)
-              if (this.checkFile(jpgFile)) {
-                  newSnapshot = readFileSync(jpgFile)
-                  unlinkSync(jpgFile)
-                  unlinkSync(videoFile)
-              }
-          } catch (e:any) {
-              console.log(e.stderr.toString())
-          }
-      }
-
-      if (newSnapshot) {
-          console.log('Successfully grabbed a snapshot from video for camera '+this.camera.id)
-      } else {
-          console.log('Failed to get snapshot from video camera '+this.camera.id)
-      }
-      this.snapshot.updating = false
-      return newSnapshot
-    }
-
-    async takeSnapshot() {
-      try {
-        // const snap = await camera.getSnapshot()
-        const snap = await this.getSnapshotFromVideo()
-
-        if (!snap) return
-
-        const base64String = snap.toString('base64');
-
-        const media = new MessageMedia("image/png", base64String, "Captura")
-        
-        this.client.sendMessage('120363177595691956@g.us', media);
-
-      } 
-      catch (error) {
-        throw error
-      }
-    }
-
-    async refreshToken(oldRefreshToken: string, newRefreshToken: string) {
-      try {
-          const currentConfig = await promisify(readFile)('.env'),
-          updatedConfig = currentConfig
-            .toString()
-            .replace(oldRefreshToken, newRefreshToken)
-
-        await promisify(writeFile)('.env', updatedConfig)  
-      } 
-      catch (error) {
-        
-      }
-    }
-
-    async startWhatsappWeb() {
-      try {
-        const { env } = process
-        
-        console.log("Initializing whatsapp web...")
-
-        if(existsSync(this.SESSION_FILE_PATH)) {
-          this.sessionData = require(this.SESSION_FILE_PATH);
-        }
-        const authStrategy = env.USE_LEGACY === 'true' ? new LegacySessionAuth({
-          session: this.sessionData
-        }) : new LocalAuth() 
-
-        this.client = new Client({
-          authStrategy,
-          puppeteer: { 
-              args: ['--no-sandbox'],
-              headless: true
-          }
-        });
-
-        this.client.initialize();
-        
-        this.client.on('qr', (qr) => {
-          qrcode.generate(qr, {small: true});
-        });
-                
-        this.client.on('ready', () => {
-          console.log('Whatsapp web client ready');
-          // this.takeSnapshot()
-        });
-
-        // this.client.on('message', async msg => {
-          // console.log(msg)
-          // console.log(await msg.getChat())
-        // });
-
-        this.client.on('authenticated', (session) => {
-          this.sessionData = session;
-          if (session)
-            writeFileSync(this.SESSION_FILE_PATH, JSON.stringify(session));
-        });  
-      } 
-      catch (error) {
-        throw error
-      }
+    async run() {
+      await this.startRing()
+      await this.startWhatsappWeb()
     }
 
     async startRing() {
@@ -239,9 +89,159 @@ class App {
       }
     }
 
-    async run() {
-      await this.startRing()
-      await this.startWhatsappWeb()
+    async startWhatsappWeb() {
+      try {
+        const { env } = process
+        
+        console.log("Initializing whatsapp web...")
+
+        if(existsSync(this.SESSION_FILE_PATH)) {
+          this.sessionData = require(this.SESSION_FILE_PATH);
+        }
+        const authStrategy = env.USE_LEGACY === 'true' ? new LegacySessionAuth({
+          session: this.sessionData
+        }) : new LocalAuth() 
+
+        this.client = new Client({
+          authStrategy,
+          puppeteer: { 
+              args: ['--no-sandbox'],
+              headless: true
+          }
+        });
+
+        this.client.initialize();
+        
+        this.client.on('qr', (qr) => {
+          qrcode.generate(qr, {small: true});
+        });
+                
+        this.client.on('ready', () => {
+          console.log('Whatsapp web client ready');
+          // this.takeSnapshot()
+        });
+
+        // this.client.on('message', async msg => {
+          // console.log(msg)
+          // console.log(await msg.getChat())
+        // });
+
+        this.client.on('authenticated', (session) => {
+          this.sessionData = session;
+          if (session)
+            writeFileSync(this.SESSION_FILE_PATH, JSON.stringify(session));
+        });  
+      } 
+      catch (error) {
+        throw error
+      }
+    }
+
+    async takeSnapshot() {
+      try {
+        // const snap = await camera.getSnapshot()
+        const snap = await this.getSnapshotFromVideo()
+
+        if (!snap) return
+
+        const base64String = snap.toString('base64');
+
+        const media = new MessageMedia("image/png", base64String, "Captura")
+        
+        this.client.sendMessage('120363177595691956@g.us', media);
+
+      } 
+      catch (error) {
+        throw error
+      }
+    }
+
+    async getSnapshotFromVideo() {
+      if (this.snapshot.updating) {
+          console.log ('Snapshot update from live stream already in progress for camera '+this.camera.id)
+          throw new Error()
+      }
+      this.snapshot.updating = true
+      let newSnapshot!: Buffer
+
+      await cleanOutputDirectory()
+
+      const videoFile = path.join(outputDirectory, "example.mp4")
+
+      await this.camera.recordToFile(videoFile, 2)
+      
+      if (videoFile) {
+          const filePrefix = this.camera.id+'_motion_'+Date.now() 
+          const jpgFile = path.join('/tmp', filePrefix+'.jpg')
+          try {
+              await spawn(this.pathToffmpeg, ['-i', videoFile, '-s', '1280:720', '-r', "1", '-vframes', '1', '-q:v', '10', jpgFile])
+              await this.waitTime(3000)
+              if (this.checkFile(jpgFile)) {
+                  newSnapshot = readFileSync(jpgFile)
+                  unlinkSync(jpgFile)
+                  unlinkSync(videoFile)
+              }
+          } catch (e:any) {
+              console.log(e.stderr.toString())
+          }
+      }
+
+      if (newSnapshot) {
+          console.log('Successfully grabbed a snapshot from video for camera '+this.camera.id)
+      } else {
+          console.log('Failed to get snapshot from video camera '+this.camera.id)
+      }
+      this.snapshot.updating = false
+      return newSnapshot
+    }
+
+    async record(camera: RingCamera) {
+      try {
+        await cleanOutputDirectory()
+
+        console.log(`Recording video from ${camera.name} ...`)
+        await camera.recordToFile(path.join(outputDirectory, 'example.mp4'), 2)
+        console.log('Done recording video')  
+      } 
+      catch (error) {
+        throw error
+      }
+    }
+
+    async refreshToken(oldRefreshToken: string, newRefreshToken: string) {
+      try {
+          const currentConfig = await promisify(readFile)('.env'),
+          updatedConfig = currentConfig
+            .toString()
+            .replace(oldRefreshToken, newRefreshToken)
+
+        await promisify(writeFile)('.env', updatedConfig)  
+      } 
+      catch (error) {
+        
+      }
+    }
+
+    waitTime(miliSeconds: number) {
+      return new Promise((resolve) => {
+  
+        setTimeout(() => {
+          resolve(true)
+        },
+          miliSeconds
+        )
+      })
+    }
+
+    checkFile(file:any, sizeInBytes: number = 0) {
+      sizeInBytes = sizeInBytes ? sizeInBytes : 0 
+      if (!existsSync(file)) {
+          return false
+      } else if (statSync(file).size > sizeInBytes) {
+          return true
+      } else {
+          return false           
+      }
     }
 }
 
