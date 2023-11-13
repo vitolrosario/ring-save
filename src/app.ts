@@ -98,15 +98,16 @@ class App {
         //   this.sessionData = require(this.SESSION_FILE_PATH);
         // }
 
-        // await mongoose.connect(env.DB_URL as string)
+        await mongoose.connect(env.DB_URL as string)
 
-        // const store = new MongoStore({ mongoose: mongoose });
+        const store = new MongoStore({ mongoose: mongoose });
 
         this.client = new Client({
-          authStrategy: new LocalAuth({dataPath: env.DATA_PATH }),/*new RemoteAuth({
+          authStrategy: new RemoteAuth({
+            dataPath: env.DATA_PATH,
             store: store,
             backupSyncIntervalMs: 300000
-          }),*/
+          }),
           puppeteer: { 
               args: ['--no-sandbox'],
               headless: true
