@@ -1,15 +1,14 @@
-import { AnyCameraData, PushNotificationAction, RingApi, RingCamera } from 'ring-client-api'
+import {  PushNotificationAction, RingApi, RingCamera } from 'ring-client-api'
 import 'dotenv/config'
-import { skip } from 'rxjs/operators'
 import { readFile, readFileSync, statSync, unlinkSync, writeFile, writeFileSync, existsSync } from 'fs'
 import { promisify } from 'util'
 import { cleanOutputDirectory, outputDirectory } from './utils'
 import * as path from 'path'
-import { Image } from 'image-js'
-import { Client, LegacySessionAuth, LocalAuth, MessageMedia } from 'whatsapp-web.js'
+import { Client, LegacySessionAuth, LocalAuth, MessageMedia, RemoteAuth } from 'whatsapp-web.js'
 import { Buffer } from 'buffer'
-import { RingRestClient } from 'ring-client-api/lib/rest-client'
 import { spawn } from 'node:child_process';
+import { MongoStore } from 'wwebjs-mongo';
+import mongoose from 'mongoose';
 
 // import test from 'qrcode-terminal'
 const qrcode = require('qrcode-terminal');
@@ -95,15 +94,19 @@ class App {
         
         console.log("Initializing whatsapp web...")
 
-        if(existsSync(this.SESSION_FILE_PATH)) {
-          this.sessionData = require(this.SESSION_FILE_PATH);
-        }
-        const authStrategy = env.USE_LEGACY === 'true' ? new LegacySessionAuth({
-          session: this.sessionData
-        }) : new LocalAuth() 
+        // if(existsSync(this.SESSION_FILE_PATH)) {
+        //   this.sessionData = require(this.SESSION_FILE_PATH);
+        // }
+
+        await mongoose.connect(env.DB_URL as string)
+
+        const store = new MongoStore({ mongoose: mongoose });
 
         this.client = new Client({
-          authStrategy,
+          authStrategy: new RemoteAuth({
+            store: store,
+            backupSyncIntervalMs: 300000
+          }),
           puppeteer: { 
               args: ['--no-sandbox'],
               headless: true
