@@ -203,7 +203,7 @@ class App {
 
     async record(camera: RingCamera) {
       try {
-        await cleanOutputDirectory()
+        // await cleanOutputDirectory()
         const fileName = this.getRecordingFileName(new Date())
 
         console.log(`Recording video from ${camera.name} ...`)
