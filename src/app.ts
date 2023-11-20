@@ -255,7 +255,7 @@ class App {
     }
 
     getRecordingFileName(date: Date) {
-      const formattedDate = moment(date).tz('America/Santo_Domingo').format('DD_MM_YYYY_hh_mm_A');
+      const formattedDate = moment(date).tz('America/Santo_Domingo').format('hh_mm_A_DD_MM_YYYY');
       return `${formattedDate}.mp4`;
     }
 }
