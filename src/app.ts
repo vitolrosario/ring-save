@@ -9,6 +9,7 @@ import { Buffer } from 'buffer'
 import { spawn } from 'node:child_process';
 import { MongoStore } from 'wwebjs-mongo';
 import mongoose from 'mongoose';
+import { join } from 'path'
 
 // import test from 'qrcode-terminal'
 const qrcode = require('qrcode-terminal');
@@ -21,6 +22,7 @@ class App {
     client!: Client
     snapshot = {updating: false}
     pathToffmpeg: string = process.env.FFMPEG_PATH || "C:/ffmpeg/bin/ffmpeg.exe"
+    recordingsPath: string = process.env.RECORDINGS_PATH || join(__dirname, 'recordings') 
 
     async run() {
       await this.startRing()
@@ -73,8 +75,8 @@ class App {
                 ? 'Doorbell pressed'
                 : `Video started (${notification.action})`
 
-            // await this.record(camera)
             this.takeSnapshot()
+            this.record(camera)
     
             console.log(
               `${event} on ${camera.name} camera. Ding id ${
@@ -103,11 +105,11 @@ class App {
         const store = new MongoStore({ mongoose: mongoose });
 
         this.client = new Client({
-          authStrategy: new RemoteAuth({
+          authStrategy: env.DATA_PATH ? new RemoteAuth({
             dataPath: env.DATA_PATH,
             store: store,
             backupSyncIntervalMs: 300000
-          }),
+          }) : new LocalAuth(),
           puppeteer: { 
               args: ['--no-sandbox'],
               headless: true
@@ -130,11 +132,11 @@ class App {
           // console.log(await msg.getChat())
         // });
 
-        this.client.on('authenticated', (session) => {
-          this.sessionData = session;
-          if (session)
-            writeFileSync(this.SESSION_FILE_PATH, JSON.stringify(session));
-        });  
+        // this.client.on('authenticated', (session) => {
+        //   this.sessionData = session;
+        //   if (session)
+        //     writeFileSync(this.SESSION_FILE_PATH, JSON.stringify(session));
+        // });  
       } 
       catch (error) {
         throw error
@@ -202,9 +204,12 @@ class App {
     async record(camera: RingCamera) {
       try {
         await cleanOutputDirectory()
+        const fileName = this.getRecordingFileName(new Date())
 
         console.log(`Recording video from ${camera.name} ...`)
-        await camera.recordToFile(path.join(outputDirectory, 'example.mp4'), 2)
+
+        await camera.recordToFile(join(this.recordingsPath, fileName), 30)
+        
         console.log('Done recording video')  
       } 
       catch (error) {
@@ -246,6 +251,18 @@ class App {
       } else {
           return false           
       }
+    }
+
+    getRecordingFileName(date: Date) {
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = date.getHours()
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const ampm = date.getHours() >= 12 ? 'PM' : 'AM';
+      const newHours = (hours % 12 || 12).toString().padStart(2, '0');
+    
+      return `${newHours}_${minutes}_${ampm}_${day}_${month}_${year}.mp4`;
     }
 }
 
