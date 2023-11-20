@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import { MongoStore } from 'wwebjs-mongo';
 import mongoose from 'mongoose';
 import { join } from 'path'
+import moment from 'moment-timezone'
 
 // import test from 'qrcode-terminal'
 const qrcode = require('qrcode-terminal');
@@ -254,15 +255,8 @@ class App {
     }
 
     getRecordingFileName(date: Date) {
-      const day = date.getDate().toString().padStart(2, '0');
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const year = date.getFullYear();
-      const hours = date.getHours()
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      const ampm = date.getHours() >= 12 ? 'PM' : 'AM';
-      const newHours = (hours % 12 || 12).toString().padStart(2, '0');
-    
-      return `${newHours}_${minutes}_${ampm}_${day}_${month}_${year}.mp4`;
+      const formattedDate = moment(date).tz('America/Santo_Domingo').format('DD_MM_YYYY_hh_mm_A');
+      return `${formattedDate}.mp4`;
     }
 }
 
