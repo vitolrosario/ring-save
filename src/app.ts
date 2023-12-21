@@ -110,7 +110,7 @@ class App {
             dataPath: env.DATA_PATH,
             store: store,
             backupSyncIntervalMs: 300000
-          }) : new LocalAuth(),
+          }) : undefined, //new LocalAuth(),
           puppeteer: { 
               args: ['--no-sandbox'],
               headless: true
