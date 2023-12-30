@@ -27,7 +27,9 @@ class App {
 
     async run() {
       await this.startRing()
-      await this.startWhatsappWeb()
+      
+      if (!process.env.SKIP_WS)
+        await this.startWhatsappWeb()
     }
 
     async startRing() {
