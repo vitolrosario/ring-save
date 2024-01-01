@@ -78,7 +78,9 @@ class App {
                 ? 'Doorbell pressed'
                 : `Video started (${notification.action})`
 
-            this.takeSnapshot()
+            if (!process.env.SKIP_WS) 
+              this.takeSnapshot()
+
             this.record(camera)
     
             console.log(
