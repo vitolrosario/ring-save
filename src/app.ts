@@ -24,6 +24,7 @@ class App {
     snapshot = {updating: false}
     pathToffmpeg: string = process.env.FFMPEG_PATH || "C:/ffmpeg/bin/ffmpeg.exe"
     recordingsPath: string = process.env.RECORDINGS_PATH || join(__dirname, 'recordings') 
+    RECORD_TIME = Number(process.env.RECORD_TIME) || 30
 
     async run() {
       await this.startRing()
@@ -213,7 +214,7 @@ class App {
 
         console.log(`Recording video from ${camera.name} ...`)
 
-        await camera.recordToFile(join(this.recordingsPath, fileName), 30)
+        await camera.recordToFile(join(this.recordingsPath, fileName), this.RECORD_TIME)
         
         console.log('Done recording video')  
       } 
