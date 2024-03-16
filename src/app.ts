@@ -11,9 +11,11 @@ import { MongoStore } from 'wwebjs-mongo';
 import mongoose from 'mongoose';
 import { join } from 'path'
 import moment from 'moment-timezone'
+import {Context, Telegraf} from 'telegraf';
+import { Update } from 'telegraf/typings/core/types/typegram'
 
-// import test from 'qrcode-terminal'
 const qrcode = require('qrcode-terminal');
+
 
 class App {
   
@@ -25,12 +27,14 @@ class App {
     pathToffmpeg: string = process.env.FFMPEG_PATH || "C:/ffmpeg/bin/ffmpeg.exe"
     recordingsPath: string = process.env.RECORDINGS_PATH || join(__dirname, 'recordings') 
     RECORD_TIME = Number(process.env.RECORD_TIME) || 30
+    telegramBot!:  Telegraf<Context<Update>> 
 
     async run() {
+      await this.startTelegram()
       await this.startRing()
       
-      if (!process.env.SKIP_WS)
-        await this.startWhatsappWeb()
+      // if (!process.env.SKIP_WS)
+      //   await this.startWhatsappWeb()
     }
 
     async startRing() {
@@ -149,18 +153,29 @@ class App {
       }
     }
 
+    async startTelegram() {
+      try {
+        this.telegramBot = new Telegraf('5765158023:AAETDc4MFi9wmLRqkAb3f_crguRRtrgdG7A');
+        this.telegramBot.launch(); 
+        console.log("Telegram bot connected")
+      } 
+      catch (error) {
+        throw error  
+      }
+    }
+
     async takeSnapshot() {
       try {
         // const snap = await camera.getSnapshot()
         const snap = await this.getSnapshotFromVideo()
-
         if (!snap) return
 
-        const base64String = snap.toString('base64');
+        // const base64String = snap.toString('base64');
+        // const media = new MessageMedia("image/png", base64String, "Captura")
+        // this.client.sendMessage('120363177595691956@g.us', media);
 
-        const media = new MessageMedia("image/png", base64String, "Captura")
-        
-        this.client.sendMessage('120363177595691956@g.us', media);
+        await this.telegramBot.telegram.sendPhoto("-4181549377", { source: snap })
+        unlinkSync(snap)
 
       } 
       catch (error) {
@@ -174,7 +189,8 @@ class App {
           throw new Error()
       }
       this.snapshot.updating = true
-      let newSnapshot!: Buffer
+      let newSnapshotRead!: Buffer
+      let newSnapshot!: string
 
       await cleanOutputDirectory()
 
@@ -184,13 +200,13 @@ class App {
       
       if (videoFile) {
           const filePrefix = this.camera.id+'_motion_'+Date.now() 
-          const jpgFile = path.join('/tmp', filePrefix+'.jpg')
+          const newSnapshot = path.join('/tmp', filePrefix+'.jpg')
           try {
-              await spawn(this.pathToffmpeg, ['-i', videoFile, '-s', '1280:720', '-r', "1", '-vframes', '1', '-q:v', '10', jpgFile])
+              await spawn(this.pathToffmpeg, ['-i', videoFile, '-s', '1280:720', '-r', "1", '-vframes', '1', '-q:v', '10', newSnapshot])
               await this.waitTime(3000)
-              if (this.checkFile(jpgFile)) {
-                  newSnapshot = readFileSync(jpgFile)
-                  unlinkSync(jpgFile)
+              if (this.checkFile(newSnapshot)) {
+                  newSnapshotRead = readFileSync(newSnapshot)
+                  // unlinkSync(newSnapshot)
                   unlinkSync(videoFile)
               }
           } catch (e:any) {
@@ -198,7 +214,7 @@ class App {
           }
       }
 
-      if (newSnapshot) {
+      if (newSnapshotRead) {
           console.log('Successfully grabbed a snapshot from video for camera '+this.camera.id)
       } else {
           console.log('Failed to get snapshot from video camera '+this.camera.id)
