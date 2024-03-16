@@ -200,7 +200,7 @@ class App {
       
       if (videoFile) {
           const filePrefix = this.camera.id+'_motion_'+Date.now() 
-          const newSnapshot = path.join('/tmp', filePrefix+'.jpg')
+          newSnapshot = path.join(outputDirectory, filePrefix+'.jpg')
           try {
               await spawn(this.pathToffmpeg, ['-i', videoFile, '-s', '1280:720', '-r', "1", '-vframes', '1', '-q:v', '10', newSnapshot])
               await this.waitTime(3000)
