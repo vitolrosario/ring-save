@@ -76,24 +76,19 @@ class App {
       if (allCameras.length) {
         allCameras.forEach((camera) => {
           camera.onNewNotification.subscribe(async (notification)=> {
-            const event =
-              notification.action === PushNotificationAction.Motion
-                ? 'Motion detected'
-                : notification.action === PushNotificationAction.Ding
-                ? 'Doorbell pressed'
-                : `Video started (${notification.action})`
+            // const event =
+            //   notification.action === PushNotificationAction.Motion
+            //     ? 'Motion detected'
+            //     : notification.action === PushNotificationAction.Ding
+            //     ? 'Doorbell pressed'
+            //     : `Video started (${notification.action})`
 
             if (!process.env.SKIP_WS) 
               this.takeSnapshot()
 
             this.record(camera)
     
-            console.log(
-              `${event} on ${camera.name} camera. Ding id ${
-                notification.ding.id
-              }.  Received at ${new Date()}`,
-            )
-          })
+            console.log(`${notification.data.event.ding.subtype} on ${camera.name} camera. Ding id ${notification.data.event.ding.id}.  Received at ${new Date()}`)})
         })
     
         console.log('Listening for motion and doorbell presses on your cameras.')
