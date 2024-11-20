@@ -13,7 +13,7 @@ import { join } from 'path'
 import moment from 'moment-timezone'
 import {Context, Telegraf} from 'telegraf';
 import { Update } from 'telegraf/typings/core/types/typegram'
-
+import axios from 'axios'
 const qrcode = require('qrcode-terminal');
 
 
@@ -40,14 +40,21 @@ class App {
     async startRing() {
 
       console.log("Initializing ring...")
+      
+      const response = await axios.get("https://api.airtable.com/v0/appLuZ0QWlu42X1xX/tblJmjFCseQafkg2J/recegG13gclKWJMCO", 
+        { headers: { "Authorization": "Bearer patnYWwTHqBkReuso.2f97e09241d2fa8774d236d28e3f72b141e7f03da01fd35be63ac10a7d600c39" }
+      })
+
+      const RING_REFRESH_TOKEN = response.data.fields["Value"]
 
       const { env } = process,
       ringApi = new RingApi({
-          refreshToken: env.RING_REFRESH_TOKEN!,
+          refreshToken: RING_REFRESH_TOKEN || env.RING_REFRESH_TOKEN!,
           debug: true,
       }),
       locations = await ringApi.getLocations(),
       allCameras = await ringApi.getCameras()
+
     
       console.log(
         `Found ${locations.length} location(s) with ${allCameras.length} camera(s).`,
